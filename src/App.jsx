@@ -10,7 +10,7 @@ async function callGemini({ prompt, systemPrompt, imageBase64, imageType, audioB
   if (audioBase64) parts.push({ inline_data: { mime_type: "audio/webm", data: audioBase64 } });
   parts.push({ text: prompt });
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
     { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ role: "user", parts }],
         systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
@@ -56,7 +56,7 @@ function SetupScreen({onDone}){
     if(!key.trim()){setError("Cole sua chave Gemini");return;}
     setTesting(true);setError("");
     try{
-      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key.trim()}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:"Responda só: OK"}]}],generationConfig:{maxOutputTokens:10}})});
+      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key.trim()}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:"Responda só: OK"}]}],generationConfig:{maxOutputTokens:10}})});
       const data=await res.json();
       if(data.error)throw new Error(data.error.message);
       localStorage.setItem("geminiKey",key.trim());
@@ -225,7 +225,7 @@ function Settings({onReset}){
   const save=()=>{localStorage.setItem("geminiKey",key);setSaved(true);setTimeout(()=>setSaved(false),2000);};
   const test=async()=>{
     setTesting(true);setMsg("");
-    try{const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:"Responda só: OK ✅"}]}],generationConfig:{maxOutputTokens:20}})});const d=await res.json();if(d.error)throw new Error(d.error.message);setMsg("✅ Chave funcionando!");}
+    try{const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:"Responda só: OK ✅"}]}],generationConfig:{maxOutputTokens:20}})});const d=await res.json();if(d.error)throw new Error(d.error.message);setMsg("✅ Chave funcionando!");}
     catch(e){setMsg("❌ "+e.message);}
     setTesting(false);
   };
