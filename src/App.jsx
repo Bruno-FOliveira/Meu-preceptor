@@ -2,6 +2,28 @@ import { useState, useRef, useEffect } from "react";
 
 const getKey = () => localStorage.getItem("geminiKey") || "";
 
+// Modelos em ordem de preferência — tenta até achar um que funcione
+const MODELS = [
+  "gemini-2.5-flash-preview-04-17",
+  "gemini-2.0-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-latest",
+  "gemini-pro",
+];
+
+let workingModel = localStorage.getItem("geminiModel") || null;
+
+async function tryModel(model, key, body) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+  );
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+
 async function callGemini({ prompt, systemPrompt, imageBase64, imageType, audioBase64, maxTokens = 3000 }) {
   const key = getKey();
   if (!key) throw new Error("Configure sua chave Gemini em ⚙️ Configurações");
@@ -9,16 +31,29 @@ async function callGemini({ prompt, systemPrompt, imageBase64, imageType, audioB
   if (imageBase64) parts.push({ inline_data: { mime_type: imageType || "image/jpeg", data: imageBase64 } });
   if (audioBase64) parts.push({ inline_data: { mime_type: "audio/webm", data: audioBase64 } });
   parts.push({ text: prompt });
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
-    { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ role: "user", parts }],
-        systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
-        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 } }) }
-  );
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const body = {
+    contents: [{ role: "user", parts }],
+    systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
+    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
+  };
+  // Se já tem modelo funcionando, usa direto
+  if (workingModel) {
+    try { return await tryModel(workingModel, key, body); } catch { workingModel = null; localStorage.removeItem("geminiModel"); }
+  }
+  // Testa modelos em ordem até achar um que funcione
+  for (const model of MODELS) {
+    try {
+      const result = await tryModel(model, key, body);
+      workingModel = model;
+      localStorage.setItem("geminiModel", model);
+      console.log("Usando modelo:", model);
+      return result;
+    } catch (e) {
+      if (e.message.includes("API key") || e.message.includes("quota")) throw e;
+      continue; // tenta próximo modelo
+    }
+  }
+  throw new Error("Nenhum modelo Gemini disponível para esta chave. Verifique sua chave em aistudio.google.com");
 }
 
 const SYS = `Você é o PRECEPTOR — médico clínico com 30 anos de experiência. Residente de Clínica Médica brasileiro.
@@ -56,12 +91,12 @@ function SetupScreen({onDone}){
     if(!key.trim()){setError("Cole sua chave Gemini");return;}
     setTesting(true);setError("");
     try{
-      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key.trim()}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:"Responda só: OK"}]}],generationConfig:{maxOutputTokens:10}})});
-      const data=await res.json();
-      if(data.error)throw new Error(data.error.message);
-      localStorage.setItem("geminiKey",key.trim());
+      workingModel = null;
+      localStorage.removeItem("geminiModel");
+      localStorage.setItem("geminiKey", key.trim());
+      await callGemini({prompt:"Responda só: OK"});
       onDone();
-    }catch(e){setError("Chave inválida: "+e.message);}
+    }catch(e){setError("Chave inválida: "+e.message);localStorage.removeItem("geminiKey");}
     setTesting(false);
   };
   return(
@@ -225,8 +260,12 @@ function Settings({onReset}){
   const save=()=>{localStorage.setItem("geminiKey",key);setSaved(true);setTimeout(()=>setSaved(false),2000);};
   const test=async()=>{
     setTesting(true);setMsg("");
-    try{const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:"Responda só: OK ✅"}]}],generationConfig:{maxOutputTokens:20}})});const d=await res.json();if(d.error)throw new Error(d.error.message);setMsg("✅ Chave funcionando!");}
-    catch(e){setMsg("❌ "+e.message);}
+    try{
+      workingModel=null;localStorage.removeItem("geminiModel");
+      localStorage.setItem("geminiKey",key);
+      const r=await callGemini({prompt:"Responda só: OK ✅",maxTokens:20});
+      setMsg("✅ Funcionando! Modelo: "+workingModel);
+    }catch(e){setMsg("❌ "+e.message);}
     setTesting(false);
   };
   return(
