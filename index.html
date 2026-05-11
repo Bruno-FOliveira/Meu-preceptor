@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#060c18" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Preceptor" />
+
+    <!-- SEO / Meta -->
+    <meta name="description" content="Preceptor Médico — Residência em Clínica Médica baseada em evidências" />
+    <meta name="application-name" content="Preceptor Médico" />
+
+    <!-- Ícones -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- Splash screen iOS -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+
+    <title>Preceptor Médico</title>
+
+    <style>
+      /* Previne flash branco no carregamento */
+      html, body { background: #060c18; margin: 0; padding: 0; }
+      /* Safe area para notch/punch-hole */
+      #root { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Registra o Service Worker para PWA -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => {
+              // Verifica atualizações a cada 30 min
+              setInterval(() => reg.update(), 30 * 60 * 1000);
+
+              // Quando há nova versão disponível
+              reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // Mostra banner de atualização
+                    const banner = document.createElement('div');
+                    banner.innerHTML = `
+                      <div style="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0b1628;border:1px solid rgba(99,179,237,0.3);border-radius:12px;padding:12px 18px;display:flex;align-items:center;gap:12px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.5);max-width:340px;width:90%">
+                        <span style="font-size:20px">🔄</span>
+                        <div style="flex:1;color:#e8f4fd;font-size:13px;font-family:Georgia,serif">Nova versão disponível!</div>
+                        <button onclick="navigator.serviceWorker.controller.postMessage('skipWaiting');window.location.reload()" style="background:linear-gradient(135deg,#63b3ed,#4299e1);border:none;border-radius:8px;color:#fff;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700;font-family:Georgia,serif">Atualizar</button>
+                      </div>`;
+                    document.body.appendChild(banner);
+                    setTimeout(() => banner.remove(), 15000);
+                  }
+                });
+              });
+            })
+            .catch(err => console.log('SW error:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
